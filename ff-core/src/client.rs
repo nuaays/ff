@@ -1,8 +1,8 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use fuso_api::{
-    async_trait, Advice, AsyncTcpSocketEx, DynCipher, Error, Forward, FusoListener, FusoPacket,
-    FusoStreamEx, Result, Security, SecurityEx, Spawn,
+use ff_api::{
+    async_trait, Advice, AsyncTcpSocketEx, DynCipher, Error, Forward, FFListener, FFPacket,
+    FFStreamEx, Result, Security, SecurityEx, Spawn,
 };
 
 use futures::{AsyncRead, AsyncWrite};
@@ -24,15 +24,15 @@ use crate::{
 };
 
 #[allow(unused)]
-pub struct FusoProxy {
+pub struct FFProxy {
     conv: u64,
     action: Action,
     addr: String,
     context: Arc<Context>,
 }
 
-pub struct Fuso {
-    accept_ax: Receiver<FusoProxy>,
+pub struct FF {
+    accept_ax: Receiver<FFProxy>,
 }
 
 pub struct Builder {
@@ -40,7 +40,7 @@ pub struct Builder {
     advices: Vec<Arc<dyn Advice<TcpStream, Box<DynCipher>> + Send + Sync + 'static>>,
     cipher: Option<
         Box<
-            dyn Fn(Option<String>) -> fuso_api::Result<Option<Box<DynCipher>>>
+            dyn Fn(Option<String>) -> ff_api::Result<Option<Box<DynCipher>>>
                 + Send
                 + Sync
                 + 'static,
@@ -79,7 +79,7 @@ pub struct Context {
     pub(crate) cipher: Arc<
         Option<
             Box<
-                dyn Fn(Option<String>) -> fuso_api::Result<Option<Box<DynCipher>>>
+                dyn Fn(Option<String>) -> ff_api::Result<Option<Box<DynCipher>>>
                     + Send
                     + Sync
                     + 'static,
@@ -89,7 +89,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn get_cipher(&self) -> fuso_api::Result<Option<Box<DynCipher>>> {
+    pub fn get_cipher(&self) -> ff_api::Result<Option<Box<DynCipher>>> {
         let secret = self.config.crypt_secret.clone();
         if let Some(create_cipher) = self.cipher.as_ref() {
             create_cipher(secret)
@@ -115,14 +115,14 @@ impl Builder {
 
     pub fn set_cipher<F>(mut self, cipher: F) -> Self
     where
-        F: Fn(Option<String>) -> fuso_api::Result<Option<Box<DynCipher>>> + Send + Sync + 'static,
+        F: Fn(Option<String>) -> ff_api::Result<Option<Box<DynCipher>>> + Send + Sync + 'static,
     {
         let cipher = Box::new(cipher);
         self.cipher = Some(cipher);
         self
     }
 
-    pub async fn build(self) -> fuso_api::Result<Fuso> {
+    pub async fn build(self) -> ff_api::Result<FF> {
         let cfg = Arc::new(self.config.expect("config required"));
 
         let cx = Context {
@@ -153,9 +153,9 @@ impl Builder {
 
         let mut stream = if let Some(cipher) = cipher {
             let cipher = stream.cipher(cipher);
-            cipher.as_fuso_stream()
+            cipher.as_ff_stream()
         } else {
-            stream.as_fuso_stream()
+            stream.as_ff_stream()
         };
 
         let json = serde_json::json!({
@@ -185,8 +185,8 @@ impl Builder {
 
                 async move {
                     let race_future = smol::future::race(
-                        Fuso::run_core(conv, cx.clone(), stream, accept_tx, server_addr.clone()),
-                        Fuso::run_udp_forward(conv, server_addr, cx.clone()),
+                        FF::run_core(conv, cx.clone(), stream, accept_tx, server_addr.clone()),
+                        FF::run_udp_forward(conv, server_addr, cx.clone()),
                     );
 
                     let bridge_future = async move {
@@ -194,7 +194,7 @@ impl Builder {
                             smol::future::pending::<()>().await;
                         } else {
                             let _ =
-                                Fuso::run_bridge(bridge_addr.unwrap(), server_socket_addr).await;
+                                FF::run_bridge(bridge_addr.unwrap(), server_socket_addr).await;
                         }
                         Ok(())
                     };
@@ -210,11 +210,11 @@ impl Builder {
             _ => {}
         }
 
-        Ok(Fuso { accept_ax })
+        Ok(FF { accept_ax })
     }
 }
 
-impl Fuso {
+impl FF {
     pub fn builder() -> Builder {
         Builder {
             advices: Vec::new(),
@@ -285,9 +285,9 @@ impl Fuso {
                 );
 
                 let udp_bind = if cipher.is_some() {
-                    udp_bind.cipher(cipher.unwrap()).as_fuso_stream()
+                    udp_bind.cipher(cipher.unwrap()).as_ff_stream()
                 } else {
-                    udp_bind.as_fuso_stream()
+                    udp_bind.as_ff_stream()
                 };
 
                 let mut udp_bind = udp_bind.guard(5000).await?;
@@ -315,7 +315,7 @@ impl Fuso {
         conv: u64,
         context: Arc<Context>,
         core: S,
-        accept_tx: Sender<FusoProxy>,
+        accept_tx: Sender<FFProxy>,
         server_addr: String,
     ) -> Result<()>
     where
@@ -334,7 +334,7 @@ impl Fuso {
                     Self::udp_forward(core.clone(), id, addr, packet).detach()
                 }
                 action => {
-                    let proxy = FusoProxy {
+                    let proxy = FFProxy {
                         conv,
                         action,
                         addr: server_addr.clone(),
@@ -342,7 +342,7 @@ impl Fuso {
                     };
 
                     accept_tx.send(proxy).await.map_err(|e| {
-                        let err: fuso_api::Error = e.to_string().into();
+                        let err: ff_api::Error = e.to_string().into();
                         err
                     })?;
                 }
@@ -376,7 +376,7 @@ impl Fuso {
     }
 }
 
-impl FusoProxy {
+impl FFProxy {
     #[inline]
     pub async fn join(self) -> Result<(TcpStream, TcpStream, Arc<Context>)> {
         let config = self.context.config.clone();
@@ -421,9 +421,9 @@ impl FusoProxy {
 }
 
 #[async_trait]
-impl FusoListener<FusoProxy> for Fuso {
+impl FFListener<FFProxy> for FF {
     #[inline]
-    async fn accept(&mut self) -> Result<FusoProxy> {
+    async fn accept(&mut self) -> Result<FFProxy> {
         Ok(self.accept_ax.recv().await.map_err(|e| {
             Error::with_io(std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -439,8 +439,8 @@ impl FusoListener<FusoProxy> for Fuso {
     }
 }
 
-impl futures::Stream for Fuso {
-    type Item = FusoProxy;
+impl futures::Stream for FF {
+    type Item = FFProxy;
 
     #[inline]
     fn poll_next(

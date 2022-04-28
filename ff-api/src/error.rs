@@ -16,7 +16,7 @@ pub enum ErrorKind {
 
 #[derive(Debug)]
 pub enum Repr {
-    Fuso(ErrorKind),
+    FF(ErrorKind),
     IO(std::io::Error),
 }
 
@@ -52,7 +52,7 @@ impl From<ErrorKind> for Error {
     #[inline]
     fn from(kind: ErrorKind) -> Self {
         Self {
-            repr: Repr::Fuso(kind),
+            repr: Repr::FF(kind),
         }
     }
 }
@@ -97,7 +97,7 @@ impl From<&str> for Error {
     #[inline]
     fn from(txt: &str) -> Self {
         Self {
-            repr: Repr::Fuso(ErrorKind::Customer(txt.into())),
+            repr: Repr::FF(ErrorKind::Customer(txt.into())),
         }
     }
 }
@@ -106,7 +106,7 @@ impl From<String> for Error {
     #[inline]
     fn from(txt: String) -> Self {
         Self {
-            repr: Repr::Fuso(ErrorKind::Customer(txt.into())),
+            repr: Repr::FF(ErrorKind::Customer(txt.into())),
         }
     }
 }
@@ -115,7 +115,7 @@ impl From<Error> for std::io::Error {
     fn from(e: Error) -> Self {
         match e.repr {
             Repr::IO(e) => e,
-            Repr::Fuso(e) => std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", e)),
+            Repr::FF(e) => std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", e)),
         }
     }
 }
@@ -123,7 +123,7 @@ impl From<Error> for std::io::Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err = match &self.repr {
-            Repr::Fuso(kind) => match kind {
+            Repr::FF(kind) => match kind {
                 ErrorKind::BadPacket => format!("{}", "BadPacket"),
                 ErrorKind::UnHandler => format!("{}", "UnHandler"),
                 ErrorKind::Customer(customer) => customer.clone(),

@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use fuso_api::Packet;
+use ff_api::Packet;
 
 use crate::cmd::{
     CMD_ACCEPT, CMD_BIND, CMD_CONNECT, CMD_ERROR, CMD_FORWARD, CMD_PING, CMD_RESET, CMD_UDP_BIND,
@@ -73,9 +73,9 @@ impl From<SocketAddr> for Addr {
 }
 
 impl TryFrom<&[u8]> for Addr {
-    type Error = fuso_api::Error;
+    type Error = ff_api::Error;
 
-    fn try_from(raw: &[u8]) -> Result<Self, fuso_api::Error> {
+    fn try_from(raw: &[u8]) -> Result<Self, ff_api::Error> {
         let mut buf: BytesMut = raw.clone().into();
         match raw {
             // ipv4
@@ -100,7 +100,7 @@ impl TryFrom<&[u8]> for Addr {
                     let size = buf.get_u8() as usize;
 
                     if buf.len() <= size {
-                        return Err(fuso_api::ErrorKind::BadPacket.into());
+                        return Err(ff_api::ErrorKind::BadPacket.into());
                     } else {
                         let domain = String::from_utf8_lossy(&buf[..size]).into();
                         buf.advance(size);
@@ -109,16 +109,16 @@ impl TryFrom<&[u8]> for Addr {
                 },
                 buf.get_u16(),
             )),
-            &[..] => Err(fuso_api::ErrorKind::BadPacket.into()),
+            &[..] => Err(ff_api::ErrorKind::BadPacket.into()),
         }
     }
 }
 
 impl TryFrom<Packet> for Action {
-    type Error = fuso_api::Error;
+    type Error = ff_api::Error;
 
     #[inline]
-    fn try_from(mut packet: fuso_api::Packet) -> Result<Self, Self::Error> {
+    fn try_from(mut packet: ff_api::Packet) -> Result<Self, Self::Error> {
         match packet.get_cmd() {
             CMD_PING => Ok(Action::Ping),
             CMD_BIND if packet.get_len().eq(&0) => Ok(Action::TcpBind(None)),
@@ -157,7 +157,7 @@ impl TryFrom<Packet> for Action {
                 let len = data.get_u32();
 
                 if data.len() < len as usize {
-                    return Err(fuso_api::ErrorKind::BadPacket.into());
+                    return Err(ff_api::ErrorKind::BadPacket.into());
                 }
 
                 let addr: Addr = data.as_ref().try_into()?;
@@ -166,7 +166,7 @@ impl TryFrom<Packet> for Action {
                 let len = data.get_u32();
 
                 if data.len() < len as usize {
-                    return Err(fuso_api::ErrorKind::BadPacket.into());
+                    return Err(ff_api::ErrorKind::BadPacket.into());
                 }
 
                 Ok(Action::UdpRequest(id, addr, data[..len as usize].to_vec()))
@@ -181,12 +181,12 @@ impl TryFrom<Packet> for Action {
             CMD_UDP_BIND if packet.get_len().ge(&8) => {
                 Ok(Action::UdpBind(packet.get_mut_data().get_u64()))
             }
-            _ => Err(fuso_api::ErrorKind::BadPacket.into()),
+            _ => Err(ff_api::ErrorKind::BadPacket.into()),
         }
     }
 }
 
-impl From<Action> for fuso_api::Packet {
+impl From<Action> for ff_api::Packet {
     fn from(packet: Action) -> Self {
         match packet {
             Action::Ping => Packet::new(CMD_PING, Bytes::new()),
@@ -245,16 +245,16 @@ impl From<Action> for fuso_api::Packet {
     }
 }
 
-impl From<fuso_socks::Addr> for Addr {
-    fn from(addr: fuso_socks::Addr) -> Self {
+impl From<ff_socks::Addr> for Addr {
+    fn from(addr: ff_socks::Addr) -> Self {
         match addr {
-            fuso_socks::Addr::Socket(addr) => Self::Socket(addr),
-            fuso_socks::Addr::Domain(domain, port) => Self::Domain(domain, port),
+            ff_socks::Addr::Socket(addr) => Self::Socket(addr),
+            ff_socks::Addr::Domain(domain, port) => Self::Domain(domain, port),
         }
     }
 }
 
-impl From<Addr> for fuso_socks::Addr {
+impl From<Addr> for ff_socks::Addr {
     fn from(addr: Addr) -> Self {
         match addr {
             Addr::Socket(addr) => Self::Socket(addr),

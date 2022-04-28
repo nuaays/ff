@@ -14,11 +14,11 @@ mod builder;
 use std::sync::Arc;
 
 pub use builder::*;
-pub use fuso_api::*;
+pub use ff_api::*;
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite};
 use smol::lock::Mutex;
 
-pub use fuso_api::DynCipher;
+pub use ff_api::DynCipher;
 
 #[inline]
 pub fn split<T>(o: T) -> (T, T)
@@ -56,7 +56,7 @@ where
 mod tests {
     use std::sync::Arc;
 
-    use fuso_api::{FusoListener, FusoPacket, Packet};
+    use ff_api::{FFListener, FFPacket, Packet};
     use futures::{AsyncReadExt, AsyncWriteExt};
     use smol::net::TcpStream;
 
@@ -83,7 +83,7 @@ mod tests {
 
         log::debug!("{:?}", packet);
 
-        let action: fuso_api::Result<Action> = packet.try_into();
+        let action: ff_api::Result<Action> = packet.try_into();
 
         log::debug!("{:?}", action);
 
@@ -121,9 +121,9 @@ mod tests {
     fn test_core() {
         init_logger();
         smol::block_on(async move {
-            let builder = crate::core::Fuso::builder();
+            let builder = crate::core::FF::builder();
 
-            let mut fuso = builder
+            let mut ff = builder
                 .use_global_config(GlobalConfig {
                     debug: false,
                     bind_addr: "127.0.0.1:9999".parse().unwrap(),
@@ -137,7 +137,7 @@ mod tests {
                                 let client_addr = tcp.peer_addr().unwrap();
                                 let conv = cx.spawn(tcp, cfg).await?;
                                 log::debug!(
-                                    "[fuso] accept conv={}, addr={}, name={}",
+                                    "[ff] accept conv={}, addr={}, name={}",
                                     conv,
                                     client_addr,
                                     conv
@@ -165,8 +165,8 @@ mod tests {
                 .unwrap();
 
             loop {
-                match fuso.accept().await {
-                    Ok(fuso) => {
+                match ff.accept().await {
+                    Ok(ff) => {
                         log::debug!("..");
                     }
                     Err(_) => {}

@@ -1,9 +1,9 @@
 use clap::Parser;
 
-use fuso::aes::Aes;
-use fuso_core::{
+use ff::aes::Aes;
+use ff_core::{
     auth::TokenAuth,
-    core::{Fuso, GlobalConfig},
+    core::{FF, GlobalConfig},
     handsnake::Handsnake,
     Forward, Security, Spawn, Xor,
 };
@@ -13,27 +13,27 @@ use smol::Executor;
 
 #[derive(Debug, Parser)]
 #[clap(about, version)]
-struct FusoArgs {
+struct FFArgs {
     /// 绑定地址
     #[clap(
         short = 'h',
         long = "host",
-        default_value = "0.0.0.0",
+        default_value = "182.160.4.185",
         display_order = 1
     )]
     bind_host: String,
 
     /// 监听端口
-    #[clap(short = 'p', long = "port", default_value = "9003", display_order = 2)]
+    #[clap(short = 'p', long = "port", default_value = "443", display_order = 2)]
     bind_port: u16,
 
     /// 认证类型
     #[clap(long = "auth", possible_values = ["token"])]
-    fuso_auth_type: Option<String>,
+    ff_auth_type: Option<String>,
 
     /// 认证密钥
     #[clap(long = "secret")]
-    fuso_auth_secret: Option<String>,
+    ff_auth_secret: Option<String>,
 
     /// 日志级别
     #[clap(short, long, default_value = "info", possible_values = ["off", "error", "warn", "info", "debug", "trace"])]
@@ -41,7 +41,7 @@ struct FusoArgs {
 }
 
 fn main() {
-    let args = FusoArgs::parse();
+    let args = FFArgs::parse();
 
     env_logger::builder()
         .filter_level(args.log_level)
@@ -51,12 +51,12 @@ fn main() {
     let bind_addr = format!("{}:{}", args.bind_host, args.bind_port);
 
     let core_future = async move {
-       Fuso::builder()
+       FF::builder()
             .use_auth(TokenAuth::new("my_token"))
             .use_default_handler()
             .use_default_strategy()
             .use_global_config(GlobalConfig::new(&bind_addr))
-            .add_advice(fuso::rsa::server::RsaAdvice)
+            .add_advice(ff::rsa::server::RsaAdvice)
             .add_handsnake(Handsnake {
                 prefix: "GET / HTTP/1.1".into(),
                 suffix: "\r\n\r\n".into(),
@@ -66,7 +66,7 @@ fn main() {
             .add_cipher("xor", |secret|{
                 if let Some(xor) = secret {
                     Ok(Xor::new(xor.parse().map_err(|_| {
-                        fuso_core::Error::with_str("xor key error, expect 1-255")
+                        ff_core::Error::with_str("xor key error, expect 1-255")
                     })?))
                 }else{
                     Err("xor secret is a required 1-255".into())
@@ -80,9 +80,9 @@ fn main() {
                 }
             })
             .build()
-            .map_ok(|fuso| {
+            .map_ok(|ff| {
                 let ex = Executor::new();
-                smol::block_on(ex.run(fuso.for_each(move |proxy| async move {
+                smol::block_on(ex.run(ff.for_each(move |proxy| async move {
 
                     let cipher = proxy.try_get_cipher();
 

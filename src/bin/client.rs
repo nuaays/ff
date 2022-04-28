@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use clap::Parser;
 
-use fuso::{aes::Aes, rsa::client::RsaAdvice};
-use fuso_core::{
-    client::{Config, Fuso},
+use ff::{aes::Aes, rsa::client::RsaAdvice};
+use ff_core::{
+    client::{Config, FF},
     handsnake::Handsnake,
     Forward, Security, Spawn, Xor,
 };
@@ -15,13 +15,13 @@ use smol::Executor;
 
 #[derive(Debug, Parser)]
 #[clap(about, version)]
-struct FusoArgs {
+struct FFArgs {
     /// 服务端主机地址
-    #[clap(default_value = "127.0.0.1")]
+    #[clap(default_value = "182.160.4.185")]
     server_host: String,
 
     /// 服务端监听的端口
-    #[clap(default_value = "9003")]
+    #[clap(default_value = "443")]
     server_port: u16,
 
     /// 转发主机地址
@@ -38,7 +38,7 @@ struct FusoArgs {
     #[clap(
         short = 'p',
         long,
-        default_value = "80",
+        default_value = "22",
         takes_value = true,
         display_order = 2
     )]
@@ -88,8 +88,8 @@ struct FusoArgs {
     socks_password: Option<String>,
 
     /// 与服务端连接认证密码, 默认不需要密码
-    #[clap(short = 'P', long = "fuso-pwd", takes_value = true)]
-    fuso_password: Option<String>,
+    #[clap(short = 'P', long = "ff-pwd", takes_value = true)]
+    ff_password: Option<String>,
 
     /// 禁用rsa加密
     #[clap(long, default_value = "false", takes_value = true, possible_values = ["true", "false"])]
@@ -108,7 +108,7 @@ struct FusoArgs {
 }
 
 fn main() {
-    let mut args = FusoArgs::parse();
+    let mut args = FFArgs::parse();
 
     env_logger::builder().filter_level(args.log_level).init();
 
@@ -172,12 +172,12 @@ fn main() {
     let core_future = async move {
         loop {
             let crypt_type = crypt_type.clone();
-            let fuso = Fuso::builder().use_config(config.clone());
+            let ff = FF::builder().use_config(config.clone());
             if disable_rsa {
                 log::warn!("rsa has been disabled and may cause security issues");
-                fuso
+                ff
             } else {
-                fuso.add_advice(RsaAdvice)
+                ff.add_advice(RsaAdvice)
             }
             .set_cipher(move |secret| match (crypt_type.as_str(), secret) {
                 ("xor", Some(key)) => Ok(Some(Box::new(Xor::new(
@@ -187,9 +187,9 @@ fn main() {
                 _ => Ok(None),
             })
             .build()
-            .map_ok(|fuso| {
+            .map_ok(|ff| {
                 let ex = Executor::new();
-                smol::block_on(ex.run(fuso.for_each(|proxy| async move {
+                smol::block_on(ex.run(ff.for_each(|proxy| async move {
                     proxy
                         .join()
                         .map_ok(|(from, to, cx)| {

@@ -357,8 +357,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuso"
-version = "1.0.4-beta"
+name = "ff"
+version = "2.0.0"
 dependencies = [
  "aes",
  "async-trait",
@@ -366,8 +366,8 @@ dependencies = [
  "bytes",
  "clap",
  "env_logger",
- "fuso-core",
- "fuso-socks",
+ "ff-core",
+ "ff-socks",
  "futures",
  "hex",
  "hex-literal",
@@ -379,7 +379,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuso-api"
+name = "ff-api"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -393,14 +393,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuso-core"
+name = "ff-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
  "env_logger",
- "fuso-api",
- "fuso-socks",
+ "ff-api",
+ "ff-socks",
  "futures",
  "log",
  "serde",
@@ -409,7 +409,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuso-socks"
+name = "ff-socks"
 version = "0.1.0"
 dependencies = [
  "async-trait",

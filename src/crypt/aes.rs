@@ -3,7 +3,7 @@ use std::pin::Pin;
 use aes::Aes128;
 use block_modes::{block_padding::Pkcs7, BlockMode, Cbc};
 use bytes::{BufMut, BytesMut};
-use fuso_core::Cipher;
+use ff_core::Cipher;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use hex::ToHex;
 use rand::Rng;
@@ -17,7 +17,7 @@ pub struct Aes {
 }
 
 impl Aes {
-    pub fn try_with(key: &str) -> fuso_core::Result<Self> {
+    pub fn try_with(key: &str) -> ff_core::Result<Self> {
         let secret = key.as_bytes();
         let mut key_buf = [0; 16];
         let mut iv_buf = [0; 16];
@@ -48,11 +48,11 @@ impl Aes {
 }
 
 impl TryFrom<String> for Aes {
-    type Error = fuso_core::Error;
+    type Error = ff_core::Error;
 
     fn try_from(secret: String) -> Result<Self, Self::Error> {
         let (key, iv) = hex::decode(secret).map_or_else(
-            |e| Err(fuso_core::Error::with_str(e.to_string())),
+            |e| Err(ff_core::Error::with_str(e.to_string())),
             |data| {
                 if data.len() != 32 {
                     Err("bad aes key".into())
@@ -69,7 +69,7 @@ impl TryFrom<String> for Aes {
         )?;
 
         let cbc = Aes128Cbc::new_from_slices(&key, &iv)
-            .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+            .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
         Ok(Self { key, iv, aes: cbc })
     }
@@ -102,7 +102,7 @@ impl Cipher for Aes {
             let len = {
                 let data = cipher.decrypt(&mut buf).map_err(|e| {
                     log::warn!("[aes] decrypt error {}", e);
-                    fuso_core::Error::with_str(e.to_string())
+                    ff_core::Error::with_str(e.to_string())
                 })?;
 
                 data.len()
@@ -141,7 +141,7 @@ impl Cipher for Aes {
                         cipher.encrypt(&mut encrypt_data, data.len()).map_or_else(
                             |e| {
                                 log::warn!("[aes] encrypt error {}", e);
-                                Err(fuso_core::Error::with_str(e.to_string()))
+                                Err(ff_core::Error::with_str(e.to_string()))
                             },
                             |data| {
                                 // let _ = Pkcs7::pad_block(&mut encrypt_data, pos);

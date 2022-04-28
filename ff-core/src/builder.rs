@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use fuso_api::{Advice, AsyncTcpSocketEx, Cipher, FusoAuth, FusoPacket, Spawn};
-use fuso_socks::{AsyncUdpForward, PasswordAuth, Socks, Socks5Ex};
+use ff_api::{Advice, AsyncTcpSocketEx, Cipher, FFAuth, FFPacket, Spawn};
+use ff_socks::{AsyncUdpForward, PasswordAuth, Socks, Socks5Ex};
 use futures::TryStreamExt;
 use smol::{
     channel::unbounded,
@@ -11,7 +11,7 @@ use smol::{
 };
 
 use crate::{
-    core::{Context, Fuso, FusoProxy, GlobalConfig, Session},
+    core::{Context, FF, FFProxy, GlobalConfig, Session},
     dispatch::{Dispatch, DynHandler, SafeTcpStream, State},
     handler::ChainHandler,
     handsnake::{Handsnake, HandsnakeEx},
@@ -20,12 +20,12 @@ use crate::{
 
 pub type DynCipher = dyn Cipher + Send + Sync + 'static;
 
-pub struct FusoBuilder<C> {
-    pub auth: Option<Arc<dyn FusoAuth<SafeTcpStream> + Send + Sync + 'static>>,
+pub struct FFBuilder<C> {
+    pub auth: Option<Arc<dyn FFAuth<SafeTcpStream> + Send + Sync + 'static>>,
     pub ciphers: HashMap<
         String,
         Arc<
-            Box<dyn Fn(Option<String>) -> fuso_api::Result<Box<DynCipher>> + Send + Sync + 'static>,
+            Box<dyn Fn(Option<String>) -> ff_api::Result<Box<DynCipher>> + Send + Sync + 'static>,
         >,
     >,
     pub config: Option<GlobalConfig>,
@@ -35,7 +35,7 @@ pub struct FusoBuilder<C> {
     pub advices: Vec<Arc<dyn Advice<SafeTcpStream, Box<DynCipher>> + Send + Sync + 'static>>,
 }
 
-impl FusoBuilder<Arc<Context>> {
+impl FFBuilder<Arc<Context>> {
     #[inline]
     pub fn use_global_config(mut self, config: GlobalConfig) -> Self {
         self.config = Some(config);
@@ -46,9 +46,9 @@ impl FusoBuilder<Arc<Context>> {
     pub fn chain_handler<F>(mut self, with_chain: F) -> Self
     where
         F: FnOnce(
-            ChainHandler<SafeTcpStream, Arc<Context>, fuso_api::Result<State<()>>>,
+            ChainHandler<SafeTcpStream, Arc<Context>, ff_api::Result<State<()>>>,
         )
-            -> ChainHandler<SafeTcpStream, Arc<Context>, fuso_api::Result<State<()>>>,
+            -> ChainHandler<SafeTcpStream, Arc<Context>, ff_api::Result<State<()>>>,
     {
         self.handlers
             .push(Arc::new(Box::new(with_chain(ChainHandler::new()))));
@@ -59,9 +59,9 @@ impl FusoBuilder<Arc<Context>> {
     pub fn chain_strategy<F>(mut self, with_chain: F) -> Self
     where
         F: FnOnce(
-            ChainHandler<SafeTcpStream, Arc<Session>, fuso_api::Result<State<Action>>>,
+            ChainHandler<SafeTcpStream, Arc<Session>, ff_api::Result<State<Action>>>,
         )
-            -> ChainHandler<SafeTcpStream, Arc<Session>, fuso_api::Result<State<Action>>>,
+            -> ChainHandler<SafeTcpStream, Arc<Session>, ff_api::Result<State<Action>>>,
     {
         self.strategys
             .push(Arc::new(Box::new(with_chain(ChainHandler::new()))));
@@ -71,7 +71,7 @@ impl FusoBuilder<Arc<Context>> {
 
     pub fn use_auth<A>(mut self, auth: A) -> Self
     where
-        A: FusoAuth<SafeTcpStream> + Send + Sync + 'static,
+        A: FFAuth<SafeTcpStream> + Send + Sync + 'static,
     {
         self.auth = Some(Arc::new(auth));
 
@@ -86,7 +86,7 @@ impl FusoBuilder<Arc<Context>> {
     pub fn add_cipher<N, F, C>(mut self, cipher_name: N, create_cipher: F) -> Self
     where
         N: Into<String>,
-        F: Fn(Option<String>) -> fuso_api::Result<C> + Send + Sync + 'static,
+        F: Fn(Option<String>) -> ff_api::Result<C> + Send + Sync + 'static,
         C: Cipher + Send + Sync + 'static,
     {
         self.ciphers.insert(
@@ -158,11 +158,11 @@ impl FusoBuilder<Arc<Context>> {
 
                             if state.is_err() {
                                 let err = state.unwrap_err().to_string();
-                                log::warn!("[fuso] Failed to open the mapping {}", err);
+                                log::warn!("[ff] Failed to open the mapping {}", err);
                                 let _ = tcp.send(Action::Err(err).into()).await?;
                             } else {
                                 log::debug!(
-                                    "[fuso] accept conv={}, addr={}",
+                                    "[ff] accept conv={}, addr={}",
                                     state.unwrap(),
                                     tcp.peer_addr().unwrap(),
                                 );
@@ -248,7 +248,7 @@ impl FusoBuilder<Arc<Context>> {
         })
     }
 
-    pub async fn build(self) -> fuso_api::Result<Fuso<FusoProxy<fuso_api::SafeStream<TcpStream>>>> {
+    pub async fn build(self) -> ff_api::Result<FF<FFProxy<ff_api::SafeStream<TcpStream>>>> {
         let config = Arc::new(self.config.unwrap());
 
         let (accept_ax, accept_tx) = unbounded();
@@ -317,6 +317,6 @@ impl FusoBuilder<Arc<Context>> {
         }
         .detach();
 
-        Ok(Fuso { accept_tx })
+        Ok(FF { accept_tx })
     }
 }

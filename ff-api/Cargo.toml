@@ -1,5 +1,5 @@
 [package]
-name = "fuso-core"
+name = "ff-api"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,9 +13,7 @@ env_logger = "0.9.0"
 log = {version = "0.4.14"}
 smol = {version = "1.2.5"}
 bytes = {version = "1.1.0"}
-serde = { version = "1.0", features = ["derive"] }
-futures = {version = "0.3"}
-fuso-api = {path = "../fuso-api"}
-fuso-socks = {path = "../fuso-socks"}
-serde_json = "1.0"
+futures = "0.3"
 async-trait = {version = "0.1.51"}
+once_cell = "1.2.0"
+num_cpus = "1.0"

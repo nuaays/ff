@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use fuso_api::{now_mills, FusoPacket, Spawn};
+use ff_api::{now_mills, FFPacket, Spawn};
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use smol::{net::TcpStream, Task};
 use std::{io::Result, net::SocketAddr};

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use fuso_api::FusoAuth;
+use ff_api::FFAuth;
 use futures::{AsyncRead, AsyncWrite};
 
 #[allow(unused)]
@@ -16,11 +16,11 @@ impl TokenAuth {
 }
 
 #[async_trait]
-impl<T> FusoAuth<T> for TokenAuth
+impl<T> FFAuth<T> for TokenAuth
 where
     T: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static,
 {
-    async fn auth(&self, _: &mut T) -> fuso_api::Result<()> {
+    async fn auth(&self, _: &mut T) -> ff_api::Result<()> {
         Ok(())
     }
 }

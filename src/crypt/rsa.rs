@@ -1,4 +1,4 @@
-use fuso_core::Cipher;
+use ff_core::Cipher;
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
@@ -42,7 +42,7 @@ impl Cipher for Rsa {
 
             let data = private_key.decrypt(padding, &packet).map_err(|e| {
                 log::warn!("[rsa] decrypt_error {}", e);
-                fuso_core::Error::with_str(e.to_string())
+                ff_core::Error::with_str(e.to_string())
             })?;
 
             Ok(data)
@@ -67,7 +67,7 @@ impl Cipher for Rsa {
         let fut = async move {
             let data = data.map_err(|e| {
                 log::warn!("[rsa] encrypt_error {}", e);
-                fuso_core::Error::with_str(e.to_string())
+                ff_core::Error::with_str(e.to_string())
             })?;
 
             io.write_all(&data).await?;
@@ -83,7 +83,7 @@ pub mod server {
     use async_trait::async_trait;
     use bytes::{Buf, BufMut, BytesMut};
 
-    use fuso_core::{Advice, DynCipher};
+    use ff_core::{Advice, DynCipher};
     use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
     use rsa::{
         pkcs1::{FromRsaPublicKey, ToRsaPublicKey},
@@ -99,7 +99,7 @@ pub mod server {
     where
         T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
     {
-        async fn advice(&self, io: &mut T) -> fuso_core::Result<Option<Box<DynCipher>>> {
+        async fn advice(&self, io: &mut T) -> ff_core::Result<Option<Box<DynCipher>>> {
             let mut buf = BytesMut::new();
 
             buf.resize(5, 0);
@@ -121,20 +121,20 @@ pub mod server {
             let pem = String::from_utf8_lossy(&buf);
 
             let public_key = RsaPublicKey::from_pkcs1_pem(&pem)
-                .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+                .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
             log::info!("rsa public key: \n{}", String::from_utf8_lossy(&buf));
 
             let mut rng = rand::rngs::OsRng;
 
             let private_key = RsaPrivateKey::new(&mut rng, 2048)
-                .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+                .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
             let my_public_key = RsaPublicKey::from(&private_key);
 
             let pem = my_public_key
                 .to_pkcs1_pem()
-                .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+                .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
             let pem = pem.as_bytes();
             let mut buf = BytesMut::new();
@@ -154,7 +154,7 @@ pub mod client {
     use async_trait::async_trait;
     use bytes::{Buf, BufMut, BytesMut};
 
-    use fuso_core::{Advice, DynCipher};
+    use ff_core::{Advice, DynCipher};
     use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
     use rsa::{
         pkcs1::{FromRsaPublicKey, ToRsaPublicKey},
@@ -170,17 +170,17 @@ pub mod client {
     where
         T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
     {
-        async fn advice(&self, io: &mut T) -> fuso_core::Result<Option<Box<DynCipher>>> {
+        async fn advice(&self, io: &mut T) -> ff_core::Result<Option<Box<DynCipher>>> {
             let mut rng = rand::rngs::OsRng;
 
             let private_key = RsaPrivateKey::new(&mut rng, 2048)
-                .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+                .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
             let public_key = RsaPublicKey::from(&private_key);
 
             let pem = public_key
                 .to_pkcs1_pem()
-                .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+                .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
             let pem = pem.as_bytes();
 
@@ -210,7 +210,7 @@ pub mod client {
             let pem = String::from_utf8_lossy(&buf);
 
             let public_key = RsaPublicKey::from_pkcs1_pem(&pem)
-                .map_err(|e| fuso_core::Error::with_str(e.to_string()))?;
+                .map_err(|e| ff_core::Error::with_str(e.to_string()))?;
 
             log::info!("rsa public key: \n{}", String::from_utf8_lossy(&buf));
 

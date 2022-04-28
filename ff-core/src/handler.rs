@@ -19,11 +19,11 @@ impl<D, C, R> ChainHandler<D, C, R> {
     }
 }
 
-impl<D, C, A> ChainHandler<D, C, fuso_api::Result<State<A>>> {
+impl<D, C, A> ChainHandler<D, C, ff_api::Result<State<A>>> {
     pub fn next<Chain, Fut>(mut self, chain: Chain) -> Self
     where
         Chain: Fn(D, C) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = fuso_api::Result<State<A>>> + Send + 'static,
+        Fut: Future<Output = ff_api::Result<State<A>>> + Send + 'static,
     {
         self.chains
             .push(Arc::new(Box::new(move |d, c| Box::pin(chain(d, c)))));
@@ -32,12 +32,12 @@ impl<D, C, A> ChainHandler<D, C, fuso_api::Result<State<A>>> {
 }
 
 #[async_trait]
-impl<D, C, A> crate::dispatch::Handler<D, C, A> for ChainHandler<D, C, fuso_api::Result<State<A>>>
+impl<D, C, A> crate::dispatch::Handler<D, C, A> for ChainHandler<D, C, ff_api::Result<State<A>>>
 where
     D: Clone + Send + Sync + 'static,
     C: Clone + Send + Sync + 'static,
 {
-    async fn dispose(&self, o: D, c: C) -> fuso_api::Result<State<A>> {
+    async fn dispose(&self, o: D, c: C) -> ff_api::Result<State<A>> {
         let chains = self.chains.clone();
 
         for chain in chains.iter() {

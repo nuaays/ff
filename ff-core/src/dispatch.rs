@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fuso_api::SafeStreamEx;
+use ff_api::SafeStreamEx;
 use futures::AsyncWriteExt;
 use smol::net::TcpStream;
 
@@ -16,21 +16,21 @@ pub enum State<T> {
 
 #[async_trait]
 pub trait Handler<D, C, A> {
-    async fn dispose(&self, o: D, c: C) -> fuso_api::Result<State<A>>;
+    async fn dispose(&self, o: D, c: C) -> ff_api::Result<State<A>>;
 }
 
 #[async_trait]
 pub trait Dispatch<H, C> {
-    async fn dispatch(self, h: H, cx: C) -> fuso_api::Result<()>;
+    async fn dispatch(self, h: H, cx: C) -> ff_api::Result<()>;
 }
 
 #[async_trait]
 pub trait StrategyEx<R, S, C> {
-    async fn select(self, strategys: S, cx: C) -> fuso_api::Result<R>;
+    async fn select(self, strategys: S, cx: C) -> ff_api::Result<R>;
 }
 
 // pub type TcpStreamRollback = Rollback<TcpStream, Buffer<u8>>;
-pub type SafeTcpStream = fuso_api::SafeStream<TcpStream>;
+pub type SafeTcpStream = ff_api::SafeStream<TcpStream>;
 
 pub type DynHandler<C, A> = dyn Handler<SafeTcpStream, C, A> + Send + Sync + 'static;
 
@@ -44,7 +44,7 @@ where
         self,
         handlers: Arc<Vec<Arc<Box<DynHandler<C, ()>>>>>,
         cx: C,
-    ) -> fuso_api::Result<()> {
+    ) -> ff_api::Result<()> {
         let mut io = self.as_safe_stream();
         for handle in handlers.iter() {
             let handle = handle.clone();
@@ -65,13 +65,13 @@ where
 
         let _ = io.close().await;
 
-        Err(fuso_api::ErrorKind::UnHandler.into())
+        Err(ff_api::ErrorKind::UnHandler.into())
     }
 }
 
 #[async_trait]
 impl<C> StrategyEx<Action, Arc<Vec<Arc<Box<DynHandler<C, Action>>>>>, C>
-    for fuso_api::SafeStream<TcpStream>
+    for ff_api::SafeStream<TcpStream>
 where
     C: Clone + Send + Sync + 'static,
 {
@@ -80,7 +80,7 @@ where
         self,
         strategys: Arc<Vec<Arc<Box<DynHandler<C, Action>>>>>,
         cx: C,
-    ) -> fuso_api::Result<Action> {
+    ) -> ff_api::Result<Action> {
         // let mut io = self.roll();
         let mut io = self;
 
@@ -108,6 +108,6 @@ where
 
         let _ = io.close().await;
 
-        Err(fuso_api::ErrorKind::UnHandler.into())
+        Err(ff_api::ErrorKind::UnHandler.into())
     }
 }

@@ -65,22 +65,22 @@ pub struct Packet {
 }
 
 #[async_trait]
-pub trait FusoPacket {
+pub trait FFPacket {
     async fn recv(&mut self) -> Result<Packet>;
     async fn send(&mut self, packet: Packet) -> Result<()>;
 }
 
-pub trait FusoStreamEx {
-    fn as_fuso_stream(self) -> FusoStream;
+pub trait FFStreamEx {
+    fn as_ff_stream(self) -> FFStream;
 }
 
 #[async_trait]
-pub trait FusoAuth<IO> {
+pub trait FFAuth<IO> {
     async fn auth(&self, io: &mut IO) -> Result<()>;
 }
 
 #[async_trait]
-pub trait FusoListener<T> {
+pub trait FFListener<T> {
     async fn accept(&mut self) -> Result<T>;
     async fn close(&mut self) -> Result<()>;
 }
@@ -105,7 +105,7 @@ pub struct Rollback<T, Store> {
 }
 
 #[derive(Clone)]
-pub struct FusoStream {
+pub struct FFStream {
     peer_addr: Option<SocketAddr>,
     local_addr: Option<SocketAddr>,
     core_reader: Arc<Mutex<dyn AsyncRead + Unpin + Send + Sync + 'static>>,
@@ -160,7 +160,7 @@ impl Packet {
                 let magic = packet.get_u32();
 
                 if Self::magic() != magic {
-                    log::warn!("decode fuso packet error {:?}", data);
+                    log::warn!("decode ff packet error {:?}", data);
                     return Err(error::ErrorKind::BadPacket.into());
                 }
 
@@ -262,7 +262,7 @@ impl From<Packet> for BytesMut {
 }
 
 #[async_trait]
-impl<T> FusoPacket for T
+impl<T> FFPacket for T
 where
     T: AsyncRead + AsyncWrite + Unpin + Sync + Send + 'static,
 {
@@ -305,14 +305,14 @@ where
     }
 }
 
-impl<T> FusoStreamEx for T
+impl<T> FFStreamEx for T
 where
     T: AsyncWrite + AsyncRead + Unpin + Send + Sync + 'static,
 {
-    fn as_fuso_stream(self) -> FusoStream {
+    fn as_ff_stream(self) -> FFStream {
         let (reader, writer) = self.split();
 
-        FusoStream {
+        FFStream {
             peer_addr: None,
             local_addr: None,
             core_reader: Arc::new(Mutex::new(reader)),
@@ -331,9 +331,9 @@ where
         static GLOBAL: once_cell::sync::Lazy<Executor<'_>> = once_cell::sync::Lazy::new(|| {
             log::info!("spawn thread count {}", num_cpus::get());
             for n in 0..num_cpus::get() {
-                log::trace!("spawn executor thread fuso-{}", n);
+                log::trace!("spawn executor thread ff-{}", n);
                 std::thread::Builder::new()
-                    .name(format!("fuso-{}", n))
+                    .name(format!("ff-{}", n))
                     .spawn(|| loop {
                         std::panic::catch_unwind(|| {
                             smol::block_on(GLOBAL.run(smol::future::pending::<()>()))
@@ -575,7 +575,7 @@ where
     }
 }
 
-impl AsyncRead for FusoStream {
+impl AsyncRead for FFStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -586,7 +586,7 @@ impl AsyncRead for FusoStream {
     }
 }
 
-impl AsyncWrite for FusoStream {
+impl AsyncWrite for FFStream {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,

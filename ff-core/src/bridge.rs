@@ -8,7 +8,7 @@ use smol::{
 };
 
 use async_trait::async_trait;
-use fuso_api::{AsyncTcpSocketEx, Error, FusoListener, Result, Spawn};
+use ff_api::{AsyncTcpSocketEx, Error, FFListener, Result, Spawn};
 
 pub struct Bridge {
     accept_ax: Receiver<(TcpStream, TcpStream)>,
@@ -83,7 +83,7 @@ impl Drop for Bridge {
 }
 
 #[async_trait]
-impl FusoListener<(TcpStream, TcpStream)> for Bridge {
+impl FFListener<(TcpStream, TcpStream)> for Bridge {
     #[inline]
     async fn accept(&mut self) -> Result<(TcpStream, TcpStream)> {
         Ok(self.accept_ax.recv().await.map_err(|e| {

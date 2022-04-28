@@ -1,13 +1,13 @@
 name: app
 version: '1.0'
 author: --
-about: https://github.com/editso/fuso
+about: 
 args:
   - server-host:
-      default_value: '127.0.0.1'
+      default_value: '182.160.4.185'
       about: 服务端监听的地址
   - server-port:
-      default_value: '9003'
+      default_value: '443'
       about: 服务端监听的端口
   - forward-host:
       short: h
@@ -18,7 +18,7 @@ args:
   - forward-port:
       short: p
       long: port
-      default_value: '80'
+      default_value: '22'
       takes_value: true
       about: 转发的端口 (如果开启了socks代理该参数将无效)
   - forward-type:

@@ -11,8 +11,8 @@ use smol::{
     stream::StreamExt,
 };
 
-use fuso_api::{
-    Advice, AsyncTcpSocketEx, Cipher, DynCipher, FusoAuth, FusoPacket, FusoStream, FusoStreamEx,
+use ff_api::{
+    Advice, AsyncTcpSocketEx, Cipher, DynCipher, FFAuth, FFPacket, FFStream, FFStreamEx,
     Result, SafeStream, SafeStreamEx, Security, Spawn, UdpListener,
 };
 
@@ -22,7 +22,7 @@ use crate::{
     dispatch::{DynHandler, SafeTcpStream},
     handsnake::Handsnake,
     packet::Action,
-    FusoBuilder,
+    FFBuilder,
 };
 
 use crate::{packet::Addr, retain::Heartbeat};
@@ -36,7 +36,7 @@ pub struct GlobalConfig {
 }
 
 #[allow(unused)]
-pub struct FusoProxy<P> {
+pub struct FFProxy<P> {
     pub cfg: Arc<Config>,
     pub(crate) session: Arc<Session>,
     pub proxy_dst: P,
@@ -73,7 +73,7 @@ pub struct Session {
     >,
     pub alloc_id: Arc<Mutex<u64>>,
     pub tcp_core: HeartGuard<SafeStream<TcpStream>>,
-    pub udp_core: Arc<Mutex<Option<HeartGuard<FusoStream>>>>,
+    pub udp_core: Arc<Mutex<Option<HeartGuard<FFStream>>>>,
     pub strategys: Arc<Vec<Arc<Box<DynHandler<Arc<Session>, Action>>>>>,
     pub global_config: Arc<GlobalConfig>,
     pub tcp_forward_map: Arc<Mutex<HashMap<u64, SafeStream<TcpStream>>>>,
@@ -82,13 +82,13 @@ pub struct Session {
 
 pub struct Udp {
     id: u64,
-    core: FusoStream,
+    core: FFStream,
     forward_map: Arc<Mutex<HashMap<u64, Sender<Vec<u8>>>>>,
 }
 
 #[derive(Clone)]
 pub struct Context {
-    pub auth: Option<Arc<dyn FusoAuth<SafeTcpStream> + Send + Sync + 'static>>,
+    pub auth: Option<Arc<dyn FFAuth<SafeTcpStream> + Send + Sync + 'static>>,
     pub config: Arc<GlobalConfig>,
     pub ciphers: Arc<
         HashMap<
@@ -99,20 +99,20 @@ pub struct Context {
     pub sessions: Arc<RwLock<HashMap<u64, Sender<(Action, SafeStream<TcpStream>)>>>>,
     pub handlers: Arc<Vec<Arc<Box<DynHandler<Arc<Self>, ()>>>>>,
     pub strategys: Arc<Vec<Arc<Box<DynHandler<Arc<Session>, Action>>>>>,
-    pub accept_ax: Sender<FusoProxy<SafeStream<TcpStream>>>,
+    pub accept_ax: Sender<FFProxy<SafeStream<TcpStream>>>,
     pub alloc_conv: Arc<Mutex<u64>>,
     pub handsnakes: Arc<Vec<Handsnake>>,
     pub advices: Vec<Arc<dyn Advice<SafeTcpStream, Box<DynCipher>> + Send + Sync + 'static>>,
 }
 
-pub struct Fuso<IO> {
+pub struct FF<IO> {
     pub(crate) accept_tx: Receiver<IO>,
 }
 
-impl Fuso<FusoProxy<TcpStream>> {
+impl FF<FFProxy<TcpStream>> {
     #[inline]
-    pub fn builder() -> FusoBuilder<Arc<Context>> {
-        FusoBuilder {
+    pub fn builder() -> FFBuilder<Arc<Context>> {
+        FFBuilder {
             auth: None,
             config: None,
             handlers: Vec::new(),
@@ -134,7 +134,7 @@ impl GlobalConfig {
 }
 
 #[async_trait]
-impl<IO> fuso_api::FusoListener<IO> for Fuso<IO>
+impl<IO> ff_api::FFListener<IO> for FF<IO>
 where
     IO: Send + Sync + 'static,
 {
@@ -152,7 +152,7 @@ where
 
 impl Session {
     #[inline]
-    pub async fn try_wake(&self, id: &u64) -> Result<fuso_api::SafeStream<TcpStream>> {
+    pub async fn try_wake(&self, id: &u64) -> Result<ff_api::SafeStream<TcpStream>> {
         match self.tcp_forward_map.lock().await.remove(id) {
             Some(tcp) => Ok(tcp),
             None => Err("No task operation required".into()),
@@ -161,7 +161,7 @@ impl Session {
 
     pub fn try_get_cipher(
         &self,
-    ) -> fuso_api::Result<Option<Box<dyn Cipher + Send + Sync + 'static>>> {
+    ) -> ff_api::Result<Option<Box<dyn Cipher + Send + Sync + 'static>>> {
         let cfg = self.config.as_ref();
         let cipher = self.ciphers.as_ref();
 
@@ -193,9 +193,9 @@ impl Session {
 
         let tcp = if let Some(cipher) = cipher {
             let tcp = tcp.cipher(cipher);
-            tcp.as_fuso_stream()
+            tcp.as_ff_stream()
         } else {
-            tcp.as_fuso_stream()
+            tcp.as_ff_stream()
         };
 
         let bind_udp = tcp.guard(5000).await?;
@@ -278,7 +278,7 @@ impl Session {
     }
 
     #[inline]
-    pub async fn udp_forward<F, Fut>(&self, forward: F) -> fuso_api::Result<()>
+    pub async fn udp_forward<F, Fut>(&self, forward: F) -> ff_api::Result<()>
     where
         F: FnOnce(UdpListener, Udp) -> Fut,
         Fut: Future<Output = std::io::Result<()>>,
@@ -288,11 +288,11 @@ impl Session {
         let core = self.udp_core.lock().await.as_ref().map_or(
             {
                 let tcp = self.tcp_core.clone();
-                tcp.as_fuso_stream()
+                tcp.as_ff_stream()
             },
             |udp_core| {
                 let udp = udp_core.clone();
-                udp.as_fuso_stream()
+                udp.as_ff_stream()
             },
         );
 
@@ -314,7 +314,7 @@ impl Session {
 
 impl Context {
     #[inline]
-    pub fn get_auth(&self) -> Option<Arc<dyn FusoAuth<SafeTcpStream> + Send + Sync + 'static>> {
+    pub fn get_auth(&self) -> Option<Arc<dyn FFAuth<SafeTcpStream> + Send + Sync + 'static>> {
         self.auth.clone()
     }
 
@@ -348,7 +348,7 @@ impl Context {
         &self,
         conv: u64,
         action: Action,
-        tcp: fuso_api::SafeStream<TcpStream>,
+        tcp: ff_api::SafeStream<TcpStream>,
     ) -> Result<()> {
         let sessions = self.sessions.read().await;
 
@@ -365,7 +365,7 @@ impl Context {
 
     pub async fn spawn(
         &self,
-        tcp: fuso_api::SafeStream<TcpStream>,
+        tcp: ff_api::SafeStream<TcpStream>,
         config: Option<String>,
     ) -> Result<u64> {
         let (conv, accept_ax) = self.fork().await;
@@ -374,7 +374,7 @@ impl Context {
 
         let cfg = Arc::new({
             config.map_or(Ok(Config::default()), |config| {
-                serde_json::from_str(&config).map_err(|e| fuso_api::Error::from(e.to_string()))
+                serde_json::from_str(&config).map_err(|e| ff_api::Error::from(e.to_string()))
             })?
         });
 
@@ -430,7 +430,7 @@ impl Context {
                         match action {
                             Action::Connect(_, id) => {
                                 if let Ok(proxy_src) = session.try_wake(&id).await {
-                                    let proxy = FusoProxy {
+                                    let proxy = FFProxy {
                                         proxy_src,
                                         proxy_dst,
                                         session: session.clone(),
@@ -462,7 +462,7 @@ impl Context {
                 }
             };
 
-            let fuso_future = {
+            let ff_future = {
                 let mut core = session.tcp_core.clone();
                 // 服务端与客户端加密,
                 // let mut core = core.cipher(Xor::new(10)).await;
@@ -565,7 +565,7 @@ impl Context {
                     .await;
             };
 
-            accept_future.race(fuso_future.race(listen_future)).await
+            accept_future.race(ff_future.race(listen_future)).await
         }
         .detach();
 
@@ -573,7 +573,7 @@ impl Context {
     }
 }
 
-impl<T> FusoProxy<T> {
+impl<T> FFProxy<T> {
     #[inline]
     pub fn split(self) -> (T, T, Arc<Config>) {
         (self.proxy_src, self.proxy_dst, self.cfg)
@@ -581,12 +581,12 @@ impl<T> FusoProxy<T> {
 
     pub fn try_get_cipher(
         &self,
-    ) -> fuso_api::Result<Option<Box<dyn Cipher + Send + Sync + 'static>>> {
+    ) -> ff_api::Result<Option<Box<dyn Cipher + Send + Sync + 'static>>> {
         self.session.try_get_cipher()
     }
 }
 
-impl<T> futures::Stream for Fuso<T> {
+impl<T> futures::Stream for FF<T> {
     type Item = T;
 
     #[inline]

@@ -1,34 +1,43 @@
 [package]
-name = "fuso"
-version = "1.0.4-beta"
+name = "ff"
+version = "2.0.0"
 edition = "2021"
-authors = ["editso"]
+authors = ["nuaays"]
 readme = "README.md"
-homepage = "https://github.com/editso/fuso"
+homepage = "https://github.com/nuaays/ff"
 license-file = "LICENSE"
-description = "这是一款用于内网穿透,端口转发的工具,帮助运维,开发人员快速部署与接入内网\r\n本项目所用技术仅用于学习交流，请勿直接用于任何商业场合和非法用途\r\n项目地址: https://github.com/editso/fuso"
+description = "proxy"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
+[profile.dev]
+opt-level = 0
+overflow-checks = false
+
 [profile.release]
+incremental = true
+debug-assertions = false
+overflow-checks = false
 lto = true
-opt-level = 'z'
+opt-level = "z"
 codegen-units = 1
 panic = 'abort'
 debug = false
 
+
 [workspace]
 members = [
-    "./fuso-api",
-    "./fuso-core",
-    "./fuso-socks"
+    "./ff-api",
+    "./ff-core",
+    "./ff-socks"
 ]
 
 [[bin]]
-name = "fus"
+name = "fd"
 path = "src/bin/server.rs"
 
 [[bin]]
-name = "fuc"
+name = "fc"
 path = "src/bin/client.rs"
 
 [dependencies]
@@ -43,8 +52,8 @@ smol = {version = "1.2.5"}
 bytes = {version = "1.1.0"}
 futures = "0.3"
 env_logger = "0.9.0"
-fuso-core = {path = "./fuso-core"}
-fuso-socks = {path ="./fuso-socks"}
+ff-core = {path = "./ff-core"}
+ff-socks = {path ="./ff-socks"}
 rpassword = "5.0"
 hex = "0.4.3"
 async-trait = {version = "0.1.51"}
